@@ -34,7 +34,7 @@ class Server(object):
     requests = Queue()
     responses = Queue()
     
-    def __init__(self, host=None, port=None, protocol=None, pool=5000, fork=1, **options):
+    def __init__(self, host=None, port=None, protocol=None, pool=128, fork=1, **options):
         """Accept the minimal server configuration.
         
         If port is omitted, the host is assumed to be an on-disk UNIX domain socket file.
