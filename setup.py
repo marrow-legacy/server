@@ -43,7 +43,7 @@ setup(
         license = license,
         keywords = '',
         
-        install_requires = ['marrow.util'],
+        install_requires = ['marrow.io'],
         
         test_suite = 'nose.collector',
         tests_require = ['nose', 'coverage', 'nose-achievements'],
