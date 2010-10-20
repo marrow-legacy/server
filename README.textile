@@ -1,0 +1,3 @@
+h2. Marrow Server API
+
+This package contains a base socket server usable to implement any number of TCP-based communication protocols.  One core feature is the ability to implement both synchronous request/response protocols and asynchronous protocols.
