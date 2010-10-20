@@ -22,7 +22,7 @@ class Protocol(object):
     
     def start(self):
         # Register for new connection notifications.
-        callback = functools.partial(self._accept, server.socket)
+        callback = functools.partial(self._accept, self.server.socket)
         self.server.io.add_handler(self.server.socket.fileno(), callback, self.server.io.READ)
     
     def stop(self):
