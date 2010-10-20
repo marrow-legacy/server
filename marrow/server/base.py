@@ -56,6 +56,8 @@ class Server(object):
         
         self.io = ioloop.IOLoop.instance()
         self.wake = None
+        
+        self.name = socket.gethostname()
     
     def start(self):
         """Primary reactor loop.
@@ -105,11 +107,11 @@ class Server(object):
         # log.debug("Stopping worker thread pool.")
         # self.worker.stop()
         
-        self.io.stop()
-        
         log.debug("Executing shutdown callbacks.")
         
         self.protocol.stop()
+        
+        self.io.stop()
         
         for callback in self.callbacks['stop']:
             callback(self)
@@ -123,8 +125,6 @@ class Server(object):
         """Create a listening socket.
         
         This handles IPv6 and allows socket re-use by spawned processes.
-        
-        TCP_NODELAY should be set on client sockets as needed by the protocol.
         """
         
         host, port = self.address
@@ -143,6 +143,7 @@ class Server(object):
         # fixes.prevent_socket_inheritance(sock)
         
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setblocking(0)
         
         # If listening on the IPV6 any address ('::' = IN6ADDR_ANY), activate dual-stack.
