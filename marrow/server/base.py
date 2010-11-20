@@ -185,8 +185,8 @@ class Server(object):
         
         return
     
-    def stop(self, close=True):
-        log.info("Shutting down. %r", self.io)
+    def stop(self):
+        log.info("Shutting down.")
         
         # log.debug("Stopping worker thread pool.")
         # self.worker.stop()
@@ -196,7 +196,7 @@ class Server(object):
             
             self.protocol.stop()
             #self.io.remove_handler(self.socket.fileno())
-            if close: self.io.stop()
+            self.io.stop()
             
             for callback in self.callbacks['stop']:
                 callback(self)
