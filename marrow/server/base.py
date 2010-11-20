@@ -10,8 +10,11 @@ Additionally, provides prefork and worker thread pool capabilities.
 import os
 import functools
 import socket
+import time
+import random
 
 from inspect import isclass
+from binascii import hexlify
 from Queue import Queue, Empty
 
 from marrow.io import ioloop, iostream
@@ -40,6 +43,10 @@ class Server(object):
         If port is omitted, the host is assumed to be an on-disk UNIX domain socket file.
         
         The protocol is instantiated here, if it is a class, and passed a reference to the server and any additional arguments.
+        
+        If fork is None or less than 1, automatically detect the number of logical processors (i.e. cores) and fork that many copies.
+        
+        Do not utilze forking when you need to debug or automatically reload your code in development.
         """
         
         super(Server, self).__init__()
@@ -47,6 +54,7 @@ class Server(object):
         self.socket = None
         self.address = (host if host is not None else '', port)
         self.pool = pool
+        self.fork = fork
         
         if protocol:
             self.protocol = protocol
@@ -54,10 +62,69 @@ class Server(object):
         if isclass(self.protocol):
             self.protocol = self.protocol(self, **options)
         
-        self.io = ioloop.IOLoop.instance()
         # self.wake = None
+        self.io = None
         
         self.name = socket.gethostname()
+    
+    def processors(self):
+        try:
+            import multiprocessing
+            
+            return multiprocessing.cpu_count()
+        
+        except ImportError:
+            pass
+        
+        except NotImplementedError:
+            pass
+        
+        try:
+            return os.sysconf('SC_NPROCESSORS_CONF')
+        
+        except ValueError:
+            pass
+        
+        log.error("Unable to automatically detect logical processor count; assuming one.")
+        
+        return 1
+    
+    def serve(self, master=True):
+        self.io = ioloop.IOLoop.instance()
+        
+        log.debug("Executing startup hooks.")
+        
+        self.protocol.start()
+        
+        for callback in self.callbacks['start']:
+            callback(self)
+        
+        # Register for new connection notifications.
+        self.io.add_handler(
+                self.socket.fileno(),
+                functools.partial(self.protocol._accept, self.socket),
+                self.io.READ
+            )
+        
+        log.info("Server running with PID %d, serving on %s.", os.getpid(), ("%s:%d" % (self.address[0] if self.address[0] else '*', self.address[1])) if isinstance(self.address, tuple) else self.address)
+        
+        try:
+            self.io.start()
+        
+        except KeyboardInterrupt:
+            log.info("Recieved Control+C.")
+        
+        except SystemExit:
+            log.info("Recieved SystemExit.")
+            raise
+        
+        except:
+            log.exception("Unknown server error.")
+            raise
+        
+        finally:
+            if master: self.stop()
+            else: self.io.remove_handler(self.socket.fileno())
     
     def start(self):
         """Primary reactor loop.
@@ -75,28 +142,37 @@ class Server(object):
         
         # self.io.add_handler(self.wake.fileno(), self.responder, self.io.READ)
         
-        log.debug("Executing startup hooks.")
+        fork = self.fork
+        if fork is None or fork < 1:
+            fork = self.processors()
         
-        self.protocol.start()
+        # Single-process operation.
+        if self.fork == 1: self.serve()
         
-        for callback in self.callbacks['start']:
-            callback(self)
+        # Multi-process operation.
+        log.info("Pre-forking %d processes from PID %d.", fork, os.getpid())
         
-        # Register for new connection notifications.
-        self.io.add_handler(
-                socket.fileno(),
-                functools.partial(self.protocol._accept, socket),
-                self.io.READ
-            )
-        
-        log.info("Server running with PID %d, serving on %s.", os.getpid(), ("%s:%d" % (self.address[0] if self.address[0] else '*', self.address[1])) if isinstance(self.address, tuple) else self.address)
-        
+        for i in range(fork):
+            if os.fork() == 0:
+                try:
+                    random.seed(long(hexlify(os.urandom(16)), 16))
+                
+                except NotImplementedError:
+                    random.seed(int(time.time() * 1000) ^ os.getpid())
+                
+                self.serve(False)
+                
+                return
+            
         try:
-            self.io.start()
+            os.waitpid(-1, 0)
+        
+        except OSError:
+            pass
         
         except KeyboardInterrupt:
             log.info("Recieved Control+C.")
-            
+        
         except SystemExit:
             log.info("Recieved SystemExit.")
             raise
@@ -105,23 +181,28 @@ class Server(object):
             log.exception("Unknown server error.")
             raise
         
-        finally:
-            self.stop()
+        self.stop()
+        
+        return
     
-    def stop(self):
-        log.info("Shutting down.")
+    def stop(self, close=True):
+        log.info("Shutting down. %r", self.io)
         
         # log.debug("Stopping worker thread pool.")
         # self.worker.stop()
         
-        log.debug("Executing shutdown callbacks.")
+        if self.io is not None:
+            log.debug("Executing shutdown callbacks.")
+            
+            self.protocol.stop()
+            #self.io.remove_handler(self.socket.fileno())
+            if close: self.io.stop()
+            
+            for callback in self.callbacks['stop']:
+                callback(self)
         
-        self.protocol.stop()
-        
-        self.io.stop()
-        
-        for callback in self.callbacks['stop']:
-            callback(self)
+        elif close:
+            self.socket.close()
         
         # self.wake.close()
         # self.wake = None
@@ -165,27 +246,27 @@ class Server(object):
         return sock
 
 
-if __name__ == '__main__':
-    import logging
-    
-    logging.basicConfig(level=logging.INFO)
-    
-    from marrow.io.protocol import Protocol
-    
-    class EchoProtocol(Protocol):
-        def accept(self, client):
-            log.info("Accepted connection from %r.", client.address)
-            
-            client.write("Hello!  Type something and press enter.  Type /quit to quit.\n")
-            
-            client.read_until("\r\n", functools.partial(self.on_line, client))
-        
-        def on_line(self, client, data):
-            if data[:-2] == "/quit":
-                client.write("Goodbye!\r\n", client.close)
-                return
-            
-            client.write(data)
-            client.read_until("\r\n", functools.partial(self.on_line, client))
-    
-    Server(None, 8000, EchoProtocol).start()
+# if __name__ == '__main__':
+#     import logging
+#     
+#     logging.basicConfig(level=logging.INFO)
+#     
+#     from marrow.io.protocol import Protocol
+#     
+#     class EchoProtocol(Protocol):
+#         def accept(self, client):
+#             log.info("Accepted connection from %r.", client.address)
+#             
+#             client.write("Hello!  Type something and press enter.  Type /quit to quit.\n")
+#             
+#             client.read_until("\r\n", functools.partial(self.on_line, client))
+#         
+#         def on_line(self, client, data):
+#             if data[:-2] == "/quit":
+#                 client.write("Goodbye!\r\n", client.close)
+#                 return
+#             
+#             client.write(data)
+#             client.read_until("\r\n", functools.partial(self.on_line, client))
+#     
+#     Server(None, 8000, EchoProtocol).start()
