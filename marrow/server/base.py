@@ -55,7 +55,7 @@ class Server(object):
             self.protocol = self.protocol(self, **options)
         
         self.io = ioloop.IOLoop.instance()
-        self.wake = None
+        # self.wake = None
         
         self.name = socket.gethostname()
     
@@ -67,13 +67,13 @@ class Server(object):
         
         log.info("Starting up.")
         
-        self.wake = WaitableEvent()
+        # self.wake = WaitableEvent()
         
-        self.socket = self._socket()
-        self.socket.bind(self.address)
-        self.socket.listen(self.pool)
+        socket = self.socket = self._socket()
+        socket.bind(self.address)
+        socket.listen(self.pool)
         
-        self.io.add_handler(self.wake.fileno(), self.responder, self.io.READ)
+        # self.io.add_handler(self.wake.fileno(), self.responder, self.io.READ)
         
         log.debug("Executing startup hooks.")
         
@@ -81,6 +81,13 @@ class Server(object):
         
         for callback in self.callbacks['start']:
             callback(self)
+        
+        # Register for new connection notifications.
+        self.io.add_handler(
+                socket.fileno(),
+                functools.partial(self.protocol._accept, socket),
+                self.io.READ
+            )
         
         log.info("Server running with PID %d, serving on %s.", os.getpid(), ("%s:%d" % (self.address[0] if self.address[0] else '*', self.address[1])) if isinstance(self.address, tuple) else self.address)
         
@@ -116,8 +123,8 @@ class Server(object):
         for callback in self.callbacks['stop']:
             callback(self)
         
-        self.wake.close()
-        self.wake = None
+        # self.wake.close()
+        # self.wake = None
         
         log.info("Stopped.")
     
@@ -143,6 +150,7 @@ class Server(object):
         # fixes.prevent_socket_inheritance(sock)
         
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.setblocking(0)
         
@@ -155,33 +163,6 @@ class Server(object):
                 pass
         
         return sock
-    
-    def respond(self, client, *args):
-        self.responses.put((client, args))
-        self.wake.set()
-    
-    def responder(self, fd, events):
-        self.wake.clear()
-        responses = self.responses
-        
-        try:
-            client, response = responses.get(True, 10)
-        
-        except Empty:
-            pass
-            
-        if client.closed():
-            log.debug("Attempted to write to disconnected client: %r", client)
-            responses.task_done()
-            return
-        
-        try:
-            client.write(*response)
-        
-        except:
-            log.exception("Error writing to client: %r", client)
-        
-        responses.task_done()
 
 
 if __name__ == '__main__':
@@ -195,16 +176,16 @@ if __name__ == '__main__':
         def accept(self, client):
             log.info("Accepted connection from %r.", client.address)
             
-            self.server.respond(client, "Hello!  Type something and press enter.  Type /quit to quit.\n")
+            client.write("Hello!  Type something and press enter.  Type /quit to quit.\n")
             
             client.read_until("\r\n", functools.partial(self.on_line, client))
         
         def on_line(self, client, data):
             if data[:-2] == "/quit":
-                self.server.respond(client, "Goodbye!\r\n", client.close)
+                client.write("Goodbye!\r\n", client.close)
                 return
             
-            self.server.respond(client, data)
+            client.write(data)
             client.read_until("\r\n", functools.partial(self.on_line, client))
     
     Server(None, 8000, EchoProtocol).start()

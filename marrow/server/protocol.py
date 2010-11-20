@@ -21,9 +21,7 @@ class Protocol(object):
         self.options = options
     
     def start(self):
-        # Register for new connection notifications.
-        callback = functools.partial(self._accept, self.server.socket)
-        self.server.io.add_handler(self.server.socket.fileno(), callback, self.server.io.READ)
+        pass
     
     def stop(self):
         self.server.io.remove_handler(self.server.socket.fileno())
