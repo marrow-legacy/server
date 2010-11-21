@@ -25,14 +25,15 @@ class Protocol(object):
         pass
     
     def stop(self):
-        self.server.io.remove_handler(self.server.socket.fileno())
+        pass
     
     def _accept(self, sock, fd, events):
         try:
             connection, address = sock.accept()
         
         except socket.error, e:
-            if e[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
+            print repr(e.args)
+            if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
                 raise
             
             return

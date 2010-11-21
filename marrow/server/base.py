@@ -123,7 +123,7 @@ class Server(object):
             raise
         
         finally:
-            if master: self.stop()
+            if master: self.stop(master)
             else: self.io.remove_handler(self.socket.fileno())
     
     def start(self):
@@ -142,17 +142,19 @@ class Server(object):
         
         # self.io.add_handler(self.wake.fileno(), self.responder, self.io.READ)
         
-        fork = self.fork
-        if fork is None or fork < 1:
-            fork = self.processors()
+        if self.fork is None or self.fork < 1:
+            self.fork = self.processors()
         
         # Single-process operation.
-        if self.fork == 1: self.serve()
+        if self.fork == 1:
+            self.serve()
+            self.stop()
+            return
         
         # Multi-process operation.
-        log.info("Pre-forking %d processes from PID %d.", fork, os.getpid())
+        log.info("Pre-forking %d processes from PID %d.", self.fork, os.getpid())
         
-        for i in range(fork):
+        for i in range(self.fork):
             if os.fork() == 0:
                 try:
                     random.seed(long(hexlify(os.urandom(16)), 16))
@@ -185,7 +187,7 @@ class Server(object):
         
         return
     
-    def stop(self):
+    def stop(self, close=False):
         log.info("Shutting down.")
         
         # log.debug("Stopping worker thread pool.")
@@ -194,8 +196,8 @@ class Server(object):
         if self.io is not None:
             log.debug("Executing shutdown callbacks.")
             
+            # self.io.remove_handler(self.socket.fileno())
             self.protocol.stop()
-            #self.io.remove_handler(self.socket.fileno())
             self.io.stop()
             
             for callback in self.callbacks['stop']:
@@ -244,29 +246,3 @@ class Server(object):
                 pass
         
         return sock
-
-
-# if __name__ == '__main__':
-#     import logging
-#     
-#     logging.basicConfig(level=logging.INFO)
-#     
-#     from marrow.io.protocol import Protocol
-#     
-#     class EchoProtocol(Protocol):
-#         def accept(self, client):
-#             log.info("Accepted connection from %r.", client.address)
-#             
-#             client.write("Hello!  Type something and press enter.  Type /quit to quit.\n")
-#             
-#             client.read_until("\r\n", functools.partial(self.on_line, client))
-#         
-#         def on_line(self, client, data):
-#             if data[:-2] == "/quit":
-#                 client.write("Goodbye!\r\n", client.close)
-#                 return
-#             
-#             client.write(data)
-#             client.read_until("\r\n", functools.partial(self.on_line, client))
-#     
-#     Server(None, 8000, EchoProtocol).start()
