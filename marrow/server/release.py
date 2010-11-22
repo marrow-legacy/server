@@ -4,10 +4,10 @@
 
 
 name = "marrow.server"
-version = "0.1.1"
-release = "0.1.1"
+version = "0.9"
+release = "0.9"
 
-summary = "Abstract socket server API."
+summary = "Abstract asynchronous, multi-process socket server API."
 description = """"""
 author = "Alice Bevan-McGregor"
 email = "alice+marrow@gothcandy.com"
