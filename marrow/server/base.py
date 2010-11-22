@@ -67,7 +67,7 @@ class Server(object):
             self.protocol = protocol
         
         if isclass(self.protocol):
-            self.protocol = partial(self.protocol, self, *options)
+            self.protocol = partial(self.protocol, self, **options)
         
         # self.wake = None
         self.io = None
