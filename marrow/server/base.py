@@ -14,6 +14,7 @@ import socket
 import time
 import random
 
+from functools import partial
 from inspect import isclass
 from binascii import hexlify
 
@@ -66,7 +67,7 @@ class Server(object):
             self.protocol = protocol
         
         if isclass(self.protocol):
-            self.protocol = self.protocol(self, **options)
+            self.protocol = partial(self.protocol, self, *options)
         
         # self.wake = None
         self.io = None
@@ -97,6 +98,8 @@ class Server(object):
     
     def serve(self, master=True):
         self.io = ioloop.IOLoop.instance()
+        
+        self.protocol = self.protocol()
         
         log.debug("Executing startup hooks.")
         
