@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 class EchoProtocol(Protocol):
     def accept(self, client):
-        log.info(b"Accepted connection from %r.", client.address)
+        log.info("Accepted connection from %r.", client.address)
         
         client.write(b"Hello!  Type something and press enter.  Type /quit to quit.\n")
         client.read_until(b"\r\n", partial(self.on_line, client))
