@@ -8,6 +8,7 @@ Additionally, provides prefork and worker thread pool capabilities.
 """
 
 import os
+import sys
 import functools
 import socket
 import time
@@ -15,7 +16,12 @@ import random
 
 from inspect import isclass
 from binascii import hexlify
-from Queue import Queue, Empty
+
+if sys.version_info < (3, 0):
+    from Queue import Queue, Empty
+
+else:
+    from queue import Queue, Empty
 
 from marrow.io import ioloop, iostream
 from marrow.server.util import WaitableEvent
