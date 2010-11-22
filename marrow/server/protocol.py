@@ -4,6 +4,7 @@ import errno
 import socket
 import functools
 
+from marrow.util.compat import exception
 from marrow.io import iostream
 
 
@@ -31,9 +32,10 @@ class Protocol(object):
         try:
             connection, address = sock.accept()
         
-        except socket.error, e:
-            print repr(e.args)
-            if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
+        except socket.error:
+            exc = exception().exception
+            
+            if exc.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
                 raise
             
             return
