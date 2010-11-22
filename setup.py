@@ -13,8 +13,8 @@ except ImportError:
 from setuptools import setup, find_packages
 
 
-if sys.version_info <= (2, 5):
-    raise SystemExit("Python 2.5 or later is required.")
+if sys.version_info <= (2, 6):
+    raise SystemExit("Python 2.6 or later is required.")
 
 if sys.version_info >= (3,0):
     def execfile(filename, globals_=None, locals_=None):
@@ -43,7 +43,7 @@ setup(
         license = license,
         keywords = '',
         
-        install_requires = ['marrow.io'],
+        install_requires = ['marrow.io', 'marrow.util'],
         
         test_suite = 'nose.collector',
         tests_require = ['nose', 'coverage', 'nose-achievements'],
