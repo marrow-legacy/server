@@ -16,10 +16,11 @@ log = __import__('logging').getLogger(__name__)
 class Protocol(object):
     client = iostream.IOStream
     
-    def __init__(self, server, **options):
+    def __init__(self, server, testing=False, **options):
         super(Protocol, self).__init__()
         
         self.server = server
+        self.testing = testing
         self.options = options
     
     def start(self):
@@ -40,7 +41,7 @@ class Protocol(object):
             
             return
         
-        client = self.client(connection)
+        client = self.client(connection, io_loop=self.testing or None)
         
         self.accept(client)
     

@@ -27,6 +27,15 @@ else:
 from marrow.io import ioloop, iostream
 from marrow.server.util import WaitableEvent
 
+try:
+    import fcntl
+except ImportError:
+    if os.name == 'nt':
+        from marrow.io import win32_support
+        from marrow.io import win32_support as fcntl
+    else:
+        raise
+
 
 __all__ = ['Server']
 log = __import__('logging').getLogger(__name__)
@@ -41,10 +50,8 @@ class Server(object):
     
     protocol = None
     callbacks = {'start': [], 'stop': []}
-    requests = Queue()
-    responses = Queue()
     
-    def __init__(self, host=None, port=None, protocol=None, pool=128, fork=1, **options):
+    def __init__(self, host=None, port=None, protocol=None, pool=128, fork=1, threaded=False, **options):
         """Accept the minimal server configuration.
         
         If port is omitted, the host is assumed to be an on-disk UNIX domain socket file.
@@ -59,20 +66,20 @@ class Server(object):
         super(Server, self).__init__()
         
         self.socket = None
+        self.io = None
+        self.name = socket.gethostname()
+        
         self.address = (host if host is not None else '', port)
+        if protocol: self.protocol = protocol
         self.pool = pool
         self.fork = fork
+        self.threaded = threaded
+        self.options = options
         
-        if protocol:
-            self.protocol = protocol
-        
-        if isclass(self.protocol):
-            self.protocol = partial(self.protocol, self, **options)
-        
-        # self.wake = None
-        self.io = None
-        
-        self.name = socket.gethostname()
+        # if threaded:
+        #     self.requests = None
+        #     self.responses = None
+        #     self.wake = None
     
     def processors(self):
         try:
@@ -96,10 +103,17 @@ class Server(object):
         
         return 1
     
-    def serve(self, master=True):
-        self.io = ioloop.IOLoop.instance()
+    def serve(self, master=True, testing=False):
+        self.io = testing or ioloop.IOLoop.instance()
         
-        self.protocol = self.protocol()
+        if isclass(self.protocol):
+            self.protocol = self.protocol(self, testing, **self.options)
+        
+        # if self.threaded:
+        #     self.requests = Queue()
+        #     self.responses = Queue()
+        #     self.wake = WaitableEvent()
+        #     self.io.add_handler(self.wake.fileno(), self.responder, self.io.READ)
         
         log.debug("Executing startup hooks.")
         
@@ -116,6 +130,8 @@ class Server(object):
             )
         
         log.info("Server running with PID %d, serving on %s.", os.getpid(), ("%s:%d" % (self.address[0] if self.address[0] else '*', self.address[1])) if isinstance(self.address, tuple) else self.address)
+        
+        if testing: return
         
         try:
             self.io.start()
@@ -135,7 +151,7 @@ class Server(object):
             if master: self.stop(master)
             else: self.io.remove_handler(self.socket.fileno())
     
-    def start(self):
+    def start(self, testing=False):
         """Primary reactor loop.
         
         This handles standard signals as interpreted by Python, such as Ctrl+C.
@@ -143,21 +159,16 @@ class Server(object):
         
         log.info("Starting up.")
         
-        # self.wake = WaitableEvent()
-        
         socket = self.socket = self._socket()
         socket.bind(self.address)
         socket.listen(self.pool)
-        
-        # self.io.add_handler(self.wake.fileno(), self.responder, self.io.READ)
         
         if self.fork is None or self.fork < 1:
             self.fork = self.processors()
         
         # Single-process operation.
         if self.fork == 1:
-            self.serve()
-            self.stop()
+            self.serve(testing=testing)
             return
         
         # Multi-process operation.
@@ -196,7 +207,7 @@ class Server(object):
         
         return
     
-    def stop(self, close=False):
+    def stop(self, close=False, testing=False):
         log.info("Shutting down.")
         
         # log.debug("Stopping worker thread pool.")
@@ -207,7 +218,7 @@ class Server(object):
             
             # self.io.remove_handler(self.socket.fileno())
             self.protocol.stop()
-            self.io.stop()
+            if not testing: self.io.stop()
             
             for callback in self.callbacks['stop']:
                 callback(self)
@@ -215,8 +226,11 @@ class Server(object):
         elif close:
             self.socket.close()
         
-        # self.wake.close()
-        # self.wake = None
+        # if self.threaded:
+        #     self.requests = None
+        #     self.responses = None
+        #     self.wake.close()
+        #     self.wake = None
         
         log.info("Stopped.")
     
@@ -239,11 +253,14 @@ class Server(object):
                 addr, family, kind, protocol, name, sa = ((host, port), socket.AF_INET, socket.SOCK_STREAM, 0, "", (host, port))
         
         sock = socket.socket(family, kind, protocol)
-        # fixes.prevent_socket_inheritance(sock)
+        
+        flags = fcntl.fcntl(sock.fileno(), fcntl.F_GETFD)
+        flags |= fcntl.FD_CLOEXEC
+        fcntl.fcntl(sock.fileno(), fcntl.F_SETFD, flags)
         
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        
         sock.setblocking(0)
         
         # If listening on the IPV6 any address ('::' = IN6ADDR_ANY), activate dual-stack.
