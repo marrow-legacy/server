@@ -46,7 +46,7 @@ setup(
         install_requires = ['marrow.io', 'marrow.util'],
         
         test_suite = 'nose.collector',
-        tests_require = ['nose', 'coverage', 'nose-achievements'],
+        tests_require = ['nose', 'coverage'],
         
         classifiers = [
                 "Development Status :: 4 - Beta",
