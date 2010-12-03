@@ -16,7 +16,7 @@ from marrow.io.iostream import IOStream
 from marrow.server.base import Server
 
 
-_next_port = 10000
+_next_port = 3000
 log = __import__('logging').getLogger(__name__)
 __all__ = ['ServerTestCase']
 
@@ -25,7 +25,7 @@ __all__ = ['ServerTestCase']
 def get_unused_port():
     global _next_port
     port = _next_port
-    _next_port = _next_port + 1
+    _next_port += 1
     return port
 
 
