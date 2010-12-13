@@ -103,7 +103,7 @@ class Server(object):
         
         return 1
     
-    def serve(self, master=True, testing=False, loop=True):
+    def serve(self, master=True, testing=False):
         self.io = testing or ioloop.IOLoop.instance()
         
         if isclass(self.protocol):
@@ -131,7 +131,7 @@ class Server(object):
         
         log.info("Server running with PID %d, serving on %s.", os.getpid(), ("%s:%d" % (self.address[0] if self.address[0] else '*', self.address[1])) if isinstance(self.address, tuple) else self.address)
         
-        if testing or not loop: return
+        if testing: return
         
         try:
             self.io.start()
@@ -151,7 +151,7 @@ class Server(object):
             if master: self.stop(master)
             else: self.io.remove_handler(self.socket.fileno())
     
-    def start(self, testing=False, loop=True):
+    def start(self, testing=False):
         """Primary reactor loop.
         
         This handles standard signals as interpreted by Python, such as Ctrl+C.
@@ -168,7 +168,7 @@ class Server(object):
         
         # Single-process operation.
         if self.fork == 1:
-            self.serve(testing=testing, loop=loop)
+            self.serve(testing=testing)
             return
         
         # Multi-process operation.
