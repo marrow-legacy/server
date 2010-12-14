@@ -163,8 +163,11 @@ class Server(object):
         socket.bind(self.address)
         socket.listen(self.pool)
         
-        if self.fork is None or self.fork < 1:
+        if self.fork is None:
             self.fork = self.processors()
+        
+        elif self.fork < 1:
+            self.fork = min(1, self.processors() + self.fork)
         
         # Single-process operation.
         if self.fork == 1:
