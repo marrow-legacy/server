@@ -29,12 +29,19 @@ from marrow.server.util import WaitableEvent
 
 try:
     import fcntl
+
 except ImportError:
     if os.name == 'nt':
         from marrow.io import win32_support
         from marrow.io import win32_support as fcntl
     else:
         raise
+
+try:
+    from concurrent import futures
+
+except ImportError:
+    futures = None
 
 
 __all__ = ['Server']
@@ -60,6 +67,8 @@ class Server(object):
         
         If fork is None or less than 1, automatically detect the number of logical processors (i.e. cores) and fork that many copies.
         
+        If threaded is False, no threading is used.  If set to None, an unlimited number of threads is used (careful with that!), otherwise, if an integer, no more than that number of threads will be utilized.
+        
         Do not utilze forking when you need to debug or automatically reload your code in development.
         """
         
@@ -76,10 +85,8 @@ class Server(object):
         self.threaded = threaded
         self.options = options
         
-        # if threaded:
-        #     self.requests = None
-        #     self.responses = None
-        #     self.wake = None
+        if threaded is not False and futures is None:
+            raise NotImplementedError("You need to install the `futures` package to utilize threading.")
     
     def processors(self):
         try:
@@ -109,11 +116,9 @@ class Server(object):
         if isclass(self.protocol):
             self.protocol = self.protocol(self, testing, **self.options)
         
-        # if self.threaded:
-        #     self.requests = Queue()
-        #     self.responses = Queue()
-        #     self.wake = WaitableEvent()
-        #     self.io.add_handler(self.wake.fileno(), self.responder, self.io.READ)
+        if self.threaded is not False:
+            log.debug("Initializing the thread pool.")
+            self.executor = futures.ThreadPoolExecutor(max_workers=self.threaded)
         
         log.debug("Executing startup hooks.")
         
@@ -213,8 +218,9 @@ class Server(object):
     def stop(self, close=False, testing=False):
         log.info("Shutting down.")
         
-        # log.debug("Stopping worker thread pool.")
-        # self.worker.stop()
+        if self.threaded is not False:
+            log.debug("Stopping worker thread pool; waiting for threads.")
+            self.executor.shutdown()
         
         if self.io is not None:
             log.debug("Executing shutdown callbacks.")
@@ -228,12 +234,6 @@ class Server(object):
         
         elif close:
             self.socket.close()
-        
-        # if self.threaded:
-        #     self.requests = None
-        #     self.responses = None
-        #     self.wake.close()
-        #     self.wake = None
         
         log.info("Stopped.")
     

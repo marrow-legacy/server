@@ -30,6 +30,9 @@ class Protocol(object):
         pass
     
     def _accept(self, sock, fd, events):
+        # TODO: Move this into the Server class.
+        # Work that needs to be done can be issued within the real accept method.
+        
         try:
             connection, address = sock.accept()
         
