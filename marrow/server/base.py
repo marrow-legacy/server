@@ -8,15 +8,12 @@ Additionally, provides prefork and worker thread pool capabilities.
 """
 
 import os
-import functools
 import socket
 import time
 import random
 
 from inspect import isclass
 from binascii import hexlify
-
-from marrow.io import ioloop, iostream
 
 try:
     import fcntl
@@ -30,6 +27,11 @@ try:
     from concurrent import futures
 except ImportError:
     futures = None
+
+try:
+    from tornado import ioloop, iostream
+except ImportError:
+    from marrow.io import ioloop, iostream
 
 
 __all__ = ['Server']
@@ -95,11 +97,11 @@ class Server(object):
         
         return 1
     
-    def serve(self, master=True, testing=False):
-        self.io = testing or ioloop.IOLoop.instance()
+    def serve(self, master=True, io_loop=None):
+        self.io_loop = io_loop or ioloop.IOLoop.instance()
         
         if isclass(self.protocol):
-            self.protocol = self.protocol(self, testing, **self.options)
+            self.protocol = self.protocol(self, io_loop, **self.options)
         
         if self.threaded is not False:
             log.debug("Initializing the thread pool.")
@@ -113,18 +115,18 @@ class Server(object):
             callback(self)
         
         # Register for new connection notifications.
-        self.io.add_handler(
+        self.io_loop.add_handler(
                 self.socket.fileno(),
-                functools.partial(self.protocol._accept, self.socket),
-                self.io.READ
+                self._accept,
+                self.io_loop.READ
             )
         
         log.info("Server running with PID %d, serving on %s.", os.getpid(), ("%s:%d" % (self.address[0] if self.address[0] else '*', self.address[1])) if isinstance(self.address, tuple) else self.address)
         
-        if testing: return
+        if io_loop: return
         
         try:
-            self.io.start()
+            self.io_loop.start()
         except KeyboardInterrupt:
             log.info("Received Control+C.")
         except SystemExit:
@@ -135,9 +137,9 @@ class Server(object):
             raise
         finally:
             if master: self.stop(master)
-            else: self.io.remove_handler(self.socket.fileno())
+            else: self.io_loop.remove_handler(self.socket.fileno())
     
-    def start(self, testing=False):
+    def start(self, io_loop=None):
         """Primary reactor loop.
         
         This handles standard signals as interpreted by Python, such as Ctrl+C.
@@ -156,7 +158,7 @@ class Server(object):
         
         # Single-process operation.
         if self.fork == 1:
-            self.serve(testing=testing)
+            self.serve(io_loop=io_loop)
             return
         
         # Multi-process operation.
@@ -191,7 +193,7 @@ class Server(object):
         
         return
     
-    def stop(self, close=False, testing=False):
+    def stop(self, close=False, io_loop=None):
         log.info("Shutting down.")
         
         if self.threaded is not False:
@@ -201,13 +203,12 @@ class Server(object):
         if self.io is not None:
             log.debug("Executing shutdown callbacks.")
             
-            # self.io.remove_handler(self.socket.fileno())
+            # self.io_loop.remove_handler(self.socket.fileno())
             self.protocol.stop()
-            if not testing: self.io.stop()
+            if not io_loop: self.io_loop.stop()
             
             for callback in self.callbacks['stop']:
                 callback(self)
-        
         elif close:
             self.socket.close()
         
@@ -248,3 +249,11 @@ class Server(object):
                 pass
         
         return sock
+
+    def _accept(self, fd, events):
+        # TODO: Move this into the Server class.
+        # Work that needs to be done can be issued within the real accept method.
+        
+        connection, address = self.socket.accept()
+        stream = iostream.IOStream(connection, io_loop=self.io_loop or None)
+        self.protocol.accept(stream)

@@ -40,7 +40,7 @@ class ServerTestCase(AsyncTestCase):
         
         self.port = get_unused_port()
         self.server = Server('127.0.0.1', self.port, self.protocol, **self.arguments)
-        self.server.start(testing=self.io_loop)
+        self.server.start(io_loop=self.io_loop)
         
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         s.connect(("127.0.0.1", self.port))
