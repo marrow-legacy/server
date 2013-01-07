@@ -14,32 +14,26 @@ import socket
 import time
 import random
 
-from functools import partial
 from inspect import isclass
 from binascii import hexlify
 
+from marrow.io import ioloop, iostream
+
 if sys.version_info < (3, 0):
     from Queue import Queue, Empty
-
 else:
     from queue import Queue, Empty
 
-from marrow.io import ioloop, iostream
-from marrow.server.util import WaitableEvent
-
 try:
     import fcntl
-
 except ImportError:
     if os.name == 'nt':
-        from marrow.io import win32_support
         from marrow.io import win32_support as fcntl
     else:
         raise
 
 try:
     from concurrent import futures
-
 except ImportError:
     futures = None
 
@@ -93,16 +87,13 @@ class Server(object):
             import multiprocessing
             
             return multiprocessing.cpu_count()
-        
         except ImportError:
             pass
-        
         except NotImplementedError:
             pass
         
         try:
             return os.sysconf('SC_NPROCESSORS_CONF')
-        
         except ValueError:
             pass
         
@@ -140,18 +131,14 @@ class Server(object):
         
         try:
             self.io.start()
-        
         except KeyboardInterrupt:
-            log.info("Recieved Control+C.")
-        
+            log.info("Received Control+C.")
         except SystemExit:
-            log.info("Recieved SystemExit.")
+            log.info("Received SystemExit.")
             raise
-        
         except:
             log.exception("Unknown server error.")
             raise
-        
         finally:
             if master: self.stop(master)
             else: self.io.remove_handler(self.socket.fileno())
@@ -170,7 +157,6 @@ class Server(object):
         
         if self.fork is None:
             self.fork = self.processors()
-        
         elif self.fork < 1:
             self.fork = min(1, self.processors() + self.fork)
         
@@ -196,17 +182,13 @@ class Server(object):
             
         try:
             os.waitpid(-1, 0)
-        
         except OSError:
             pass
-        
         except KeyboardInterrupt:
-            log.info("Recieved Control+C.")
-        
+            log.info("Received Control+C.")
         except SystemExit:
-            log.info("Recieved SystemExit.")
+            log.info("Received SystemExit.")
             raise
-        
         except:
             log.exception("Unknown server error.")
             raise
@@ -247,11 +229,9 @@ class Server(object):
         
         try:
             addr, family, kind, protocol, name, sa = ((host, port), ) + socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)[0]
-        
         except socket.gaierror:
             if ':' in host:
                 addr, family, kind, protocol, name, sa = ((host, port), socket.AF_INET6, socket.SOCK_STREAM, 0, "", (host, port, 0, 0))
-            
             else:
                 addr, family, kind, protocol, name, sa = ((host, port), socket.AF_INET, socket.SOCK_STREAM, 0, "", (host, port))
         
@@ -270,7 +250,6 @@ class Server(object):
         if family == socket.AF_INET6 and addr[0] in ('::', '::0', '::0.0.0.0'):
             try:
                 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-            
             except (AttributeError, socket.error):
                 pass
         

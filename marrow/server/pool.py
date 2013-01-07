@@ -101,7 +101,6 @@ class ThreadPool(object):
                     self.protocol(request)
                     jobs += 1
                     self.queue.task_done()
-                
                 except Empty:
                     if self.finished.isSet():
                         log.debug("Worker death by external request.")
@@ -121,7 +120,6 @@ class ThreadPool(object):
                         self.spawn()
                     
                     break
-        
         except:
             log.exception("Internal error in worker thread.")
         

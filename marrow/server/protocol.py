@@ -2,7 +2,6 @@
 
 import errno
 import socket
-import functools
 
 from marrow.util.compat import exception
 from marrow.io import iostream
@@ -35,7 +34,6 @@ class Protocol(object):
         
         try:
             connection, address = sock.accept()
-        
         except socket.error:
             exc = exception().exception
             

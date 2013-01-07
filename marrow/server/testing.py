@@ -5,11 +5,7 @@
 This is a barely-modified version of the unit testing rig from Tornado.
 """
 
-import os
-import sys
-import time
 import socket
-import unittest
 
 from marrow.io.testing import AsyncTestCase
 from marrow.io.iostream import IOStream
