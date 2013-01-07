@@ -65,7 +65,7 @@ class Server(object):
         super(Server, self).__init__()
         
         self.socket = None
-        self.io = None
+        self.io_loop = None
         self.name = socket.gethostname()
         
         self.address = (host if host is not None else '', port)
@@ -251,9 +251,6 @@ class Server(object):
         return sock
 
     def _accept(self, fd, events):
-        # TODO: Move this into the Server class.
-        # Work that needs to be done can be issued within the real accept method.
-        
         connection, address = self.socket.accept()
-        stream = iostream.IOStream(connection, io_loop=self.io_loop or None)
+        stream = iostream.IOStream(connection, io_loop=self.io_loop)
         self.protocol.accept(stream)

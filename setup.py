@@ -32,7 +32,6 @@ https://github.com/marrow/marrow.server""",
         
         install_requires = [
             'marrow.io < 2.0',
-            'marrow.util < 2.0'
         ],
         
         test_suite = 'nose.collector',

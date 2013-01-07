@@ -1,8 +1,5 @@
 # encoding: utf-8
 
-import socket
-
-
 __all__ = ['Protocol']
 log = __import__('logging').getLogger(__name__)
 
