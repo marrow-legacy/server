@@ -5,7 +5,7 @@ python:
   - "3.2"
   - "3.3"
 install:
-  - pip install https://github.com/marrow/marrow.io.git#egg=marrow.io
+  - pip install git+https://github.com/marrow/marrow.io.git#egg=marrow.io
   - pip install nose coverage
   - pip install -e . --use-mirrors
 script: ./setup.py test
