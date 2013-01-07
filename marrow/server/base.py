@@ -8,7 +8,6 @@ Additionally, provides prefork and worker thread pool capabilities.
 """
 
 import os
-import sys
 import functools
 import socket
 import time
@@ -18,11 +17,6 @@ from inspect import isclass
 from binascii import hexlify
 
 from marrow.io import ioloop, iostream
-
-if sys.version_info < (3, 0):
-    from Queue import Queue, Empty
-else:
-    from queue import Queue, Empty
 
 try:
     import fcntl

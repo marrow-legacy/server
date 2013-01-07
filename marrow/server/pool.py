@@ -6,11 +6,15 @@ Worker threads are spawned based on demand at the time a message is added to the
 """
 
 import logging
+import sys
 
 from math import ceil
-
-from Queue import Queue, Empty
 from threading import Event, Thread
+
+if sys.version_info < (3, 0):
+    from Queue import Queue, Empty
+else:
+    from queue import Queue, Empty
 
 
 __all__ = ['ThreadPool']
@@ -130,8 +134,6 @@ class ThreadPool(object):
 
 if __name__ == '__main__':
     """This takes about 50 seconds to run on my computer."""
-    
-    import logging
     
     logging.basicConfig(level=logging.DEBUG)
     
