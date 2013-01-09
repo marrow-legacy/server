@@ -200,7 +200,7 @@ class Server(object):
             log.debug("Stopping worker thread pool; waiting for threads.")
             self.executor.shutdown()
         
-        if self.io is not None:
+        if self.io_loop is not None:
             log.debug("Executing shutdown callbacks.")
             
             # self.io_loop.remove_handler(self.socket.fileno())
