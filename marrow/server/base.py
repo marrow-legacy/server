@@ -225,18 +225,21 @@ class Server(object):
         for family, kind, protocol, cname, sa in socket.getaddrinfo(host or None, port, flags=socket.AI_PASSIVE):
             families.add(family)
         
+        # Default to IPv6 socket if available to enable dual stack operation
         family = socket.AF_INET6 if socket.AF_INET6 in families else socket.AF_INET
+        type = socket.SOCK_STREAM | getattr(socket, 'SOCK_CLOEXEC', 0)
         sock = socket.socket(family, socket.SOCK_STREAM)
-        
+
+        # Prevent socket from being inherited by subprocesses (in case the SOCK_CLOEXEC flag wasn't available)
         flags = fcntl.fcntl(sock.fileno(), fcntl.F_GETFD)
         flags |= fcntl.FD_CLOEXEC
         fcntl.fcntl(sock.fileno(), fcntl.F_SETFD, flags)
         
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        
         sock.setblocking(0)
         
+        # Set the IPv6-only flag if no IPv4 addresses were in the resolved address list of the given host
         if socket.AF_INET not in families:
             try:
                 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
