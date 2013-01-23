@@ -221,16 +221,12 @@ class Server(object):
         """
         
         host, port = self.address
+        families = set()
+        for family, kind, protocol, cname, sa in socket.getaddrinfo(host or None, port, flags=socket.AI_PASSIVE):
+            families.add(family)
         
-        try:
-            addr, family, kind, protocol, name, sa = ((host, port), ) + socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0, socket.AI_PASSIVE)[0]
-        except socket.gaierror:
-            if ':' in host:
-                addr, family, kind, protocol, name, sa = ((host, port), socket.AF_INET6, socket.SOCK_STREAM, 0, "", (host, port, 0, 0))
-            else:
-                addr, family, kind, protocol, name, sa = ((host, port), socket.AF_INET, socket.SOCK_STREAM, 0, "", (host, port))
-        
-        sock = socket.socket(family, kind, protocol)
+        family = socket.AF_INET6 if socket.AF_INET6 in families else socket.AF_INET
+        sock = socket.socket(family, socket.SOCK_STREAM)
         
         flags = fcntl.fcntl(sock.fileno(), fcntl.F_GETFD)
         flags |= fcntl.FD_CLOEXEC
@@ -241,10 +237,9 @@ class Server(object):
         
         sock.setblocking(0)
         
-        # If listening on the IPV6 any address ('::' = IN6ADDR_ANY), activate dual-stack.
-        if family == socket.AF_INET6 and addr[0] in ('::', '::0', '::0.0.0.0'):
+        if socket.AF_INET not in families:
             try:
-                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
             except (AttributeError, socket.error):
                 pass
         
